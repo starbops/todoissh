@@ -132,10 +132,13 @@ func (t *TerminalUI) handleInput() error {
 	for {
 		n, err := t.channel.Read(buf[:])
 		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("read error: %v", err)
+			if err == io.EOF {
+				t.clear()
+				t.showCursor()
+				t.write("Goodbye!\r\n")
+				return nil
 			}
-			return nil
+			return fmt.Errorf("read error: %v", err)
 		}
 
 		if n == 0 {
@@ -315,6 +318,8 @@ func handleChannel(channel ssh.Channel, requests <-chan *ssh.Request) {
 		termUI.write("\x1b[?25h")   // Show cursor
 		termUI.write("\x1b[?7h")    // Enable line wrapping
 		termUI.write("\x1b[?1049l") // Restore main screen
+		termUI.write("Goodbye!\r\n") // Always show goodbye message
+		channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0}) // Send exit code 0
 	}()
 
 	for req := range requests {
@@ -327,7 +332,10 @@ func handleChannel(channel ssh.Channel, requests <-chan *ssh.Request) {
 			req.Reply(true, nil)
 			termUI.refreshDisplay()
 			if err := termUI.handleInput(); err != nil {
-				log.Printf("Error handling input: %v", err)
+				if err != io.EOF {
+					log.Printf("Error handling input: %v", err)
+					channel.SendRequest("exit-status", false, []byte{0, 0, 0, 1}) // Send exit code 1 for errors
+				}
 			}
 			return
 		case "pty-req":
