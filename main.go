@@ -36,6 +36,7 @@ type TerminalUI struct {
 	inputMode  bool
 	inputText  string
 	inputLabel string
+	cursorPos  int
 }
 
 func newTerminalUI(channel ssh.Channel) *TerminalUI {
@@ -46,6 +47,7 @@ func newTerminalUI(channel ssh.Channel) *TerminalUI {
 		inputLabel: "New todo: ",
 		width:      80,
 		height:    24,
+		cursorPos:  0,
 	}
 }
 
@@ -89,6 +91,7 @@ func (t *TerminalUI) refreshDisplay() {
 	t.write("Todo List\r\n")
 	t.write(strings.Repeat("─", t.width) + "\r\n")
 	t.write("Commands: ↑/↓: Navigate • Space: Toggle • Enter: Edit/Save • Tab: New • Delete: Remove • Ctrl+C: Exit\r\n")
+	t.write("         ←/→: Move cursor when editing\r\n")
 	t.write("\r\n")
 
 	// Get and sort todos
@@ -121,7 +124,7 @@ func (t *TerminalUI) refreshDisplay() {
 		t.moveTo(t.height-1, 1)
 		t.write(fmt.Sprintf("%s%s", t.inputLabel, t.inputText))
 		t.showCursor()
-		t.moveTo(t.height-1, len(t.inputLabel)+len(t.inputText)+1)
+		t.moveTo(t.height-1, len(t.inputLabel)+t.cursorPos+1)
 	} else {
 		t.hideCursor()
 	}
@@ -156,6 +159,7 @@ func (t *TerminalUI) handleInput() error {
 			if t.inputMode {
 				t.inputLabel = "New todo: "
 				t.inputText = ""
+				t.cursorPos = 0
 			}
 		case 13: // Enter
 			if t.inputMode {
@@ -170,20 +174,24 @@ func (t *TerminalUI) handleInput() error {
 				}
 				t.inputMode = false
 				t.inputText = ""
+				t.cursorPos = 0
 			} else if len(t.todos) > 0 {
 				t.inputMode = true
 				t.inputText = t.todos[t.selected].Text
 				t.inputLabel = fmt.Sprintf("Edit todo %d: ", t.todos[t.selected].ID)
+				t.cursorPos = len(t.inputText)
 			}
 		case 127: // Backspace
-			if t.inputMode && len(t.inputText) > 0 {
-				t.inputText = t.inputText[:len(t.inputText)-1]
+			if t.inputMode && len(t.inputText) > 0 && t.cursorPos > 0 {
+				t.inputText = t.inputText[:t.cursorPos-1] + t.inputText[t.cursorPos:]
+				t.cursorPos--
 			}
 		case 32: // Space
 			if !t.inputMode && len(t.todos) > 0 {
 				todoStore.ToggleComplete(t.todos[t.selected].ID)
 			} else if t.inputMode {
-				t.inputText += " "
+				t.inputText = t.inputText[:t.cursorPos] + " " + t.inputText[t.cursorPos:]
+				t.cursorPos++
 			}
 		case 27: // Escape sequence
 			seq := make([]byte, 2)
@@ -202,9 +210,16 @@ func (t *TerminalUI) handleInput() error {
 				if !t.inputMode && t.selected < len(t.todos)-1 {
 					t.selected++
 				}
+			case 67: // Right arrow
+				if t.inputMode && t.cursorPos < len(t.inputText) {
+					t.cursorPos++
+				}
+			case 68: // Left arrow
+				if t.inputMode && t.cursorPos > 0 {
+					t.cursorPos--
+				}
 			case 51: // Delete key
 				if !t.inputMode && len(t.todos) > 0 {
-					// Read the trailing ~
 					t.channel.Read(make([]byte, 1))
 					todoStore.Delete(t.todos[t.selected].ID)
 					if t.selected >= len(t.todos)-1 {
@@ -213,11 +228,14 @@ func (t *TerminalUI) handleInput() error {
 							t.selected = 0
 						}
 					}
+				} else if t.inputMode && t.cursorPos < len(t.inputText) {
+					t.inputText = t.inputText[:t.cursorPos] + t.inputText[t.cursorPos+1:]
 				}
 			}
 		default:
 			if t.inputMode && buf[0] >= 32 && buf[0] < 127 {
-				t.inputText += string(buf[0])
+				t.inputText = t.inputText[:t.cursorPos] + string(buf[0]) + t.inputText[t.cursorPos:]
+				t.cursorPos++
 			}
 		}
 
