@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+# Script to build the todoissh application
+
+echo "Building todoissh..."
+
+# Ensure dependencies are up to date
+go mod download
+
+# Run tests
+go test ./...
+
+# Build the application
+CGO_ENABLED=0 go build -o todoissh
+
+echo "Build complete: todoissh" 
