@@ -1,5 +1,9 @@
 # TodoiSSH
 
+[![CI](https://github.com/starbops/todoissh/actions/workflows/ci.yml/badge.svg)](https://github.com/starbops/todoissh/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/starbops/todoissh)](https://go.dev)
+[![License](https://img.shields.io/github/license/starbops/todoissh)](LICENSE)
+
 A terminal-based todo list application accessible via SSH, built with Go. This application allows users to manage their todo items through a clean and interactive terminal user interface.
 
 ## Features
