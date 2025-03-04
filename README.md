@@ -6,6 +6,13 @@
 
 A terminal-based todo list application accessible via SSH, built with Go. This application allows users to manage their todo items through a clean and interactive terminal user interface.
 
+## Built With
+
+This project was created through an innovative collaboration:
+- Human guidance and vision
+- [Cursor](https://cursor.sh/) - The AI-first code editor
+- Claude 3.5 Sonnet - Advanced AI assistant
+
 ## Features
 
 - **SSH Access**: Connect to your todo list from anywhere using SSH
