@@ -23,11 +23,15 @@ A terminal-based todo list application accessible via SSH, built with Go. This a
   - Tab: Create new todo
   - Delete: Remove selected todo
   - Ctrl+C: Exit application
+- **Docker Support**: Run in an isolated container for improved security
+- **Continuous Integration**: Automated testing and building via GitHub Actions
 
 ## Prerequisites
 
-- Go 1.x or higher
+- Go 1.24 or higher
 - SSH client
+- Docker (optional, for containerized deployment)
+- Make
 
 ## Installation
 
@@ -37,25 +41,40 @@ A terminal-based todo list application accessible via SSH, built with Go. This a
    cd todoissh
    ```
 
-2. Install dependencies:
+2. Build and test:
    ```bash
-   go mod download
+   make all
    ```
+   This will:
+   - Run all tests
+   - Generate test reports
+   - Build the binary
+   - Create a Docker image
 
-3. Build the application:
-   ```bash
-   go build
-   ```
+   Individual commands:
+   - `make test`: Run tests only
+   - `make build`: Build the binary
+   - `make package`: Create Docker image
+   - `make clean`: Clean up build artifacts
 
 ## Usage
 
+### Running Locally
+
 1. Start the server:
    ```bash
-   ./todoissh
+   ./bin/todoissh
    ```
    The server will start listening on port 2222 by default.
 
-2. Connect to the server using SSH:
+### Running with Docker
+
+1. Start the container:
+   ```bash
+   docker run -d -p 2222:2222 todoissh
+   ```
+
+2. Connect to the server:
    ```bash
    ssh localhost -p 2222
    ```
@@ -71,8 +90,29 @@ The project structure is organized as follows:
   - `ssh/`: SSH server implementation
   - `todo/`: Todo list data structure and operations
   - `ui/`: Terminal user interface implementation
+- `scripts/`: Build and test scripts
+  - `build`: Builds the application
+  - `test`: Runs tests and generates reports
+  - `package`: Creates Docker image
+- `bin/`: Build artifacts (not in git)
+- `test/reports/`: Test results and coverage reports (not in git)
+- `.github/workflows/`: CI pipeline definitions
+- `Dockerfile`: Container definition
+- `Makefile`: Build automation
 - `.gitignore`: Specifies which files Git should ignore
 - `go.mod` & `go.sum`: Go module files for dependency management
+
+## Testing
+
+Run the test suite:
+```bash
+make test
+```
+
+Test artifacts will be generated in `test/reports/`:
+- `coverage.html`: HTML coverage report
+- `test-report.json`: Detailed test results
+- `test-summary.txt`: Human-readable test summary
 
 ## Security Note
 
@@ -80,6 +120,7 @@ This is a demonstration project and includes simplified security measures:
 - Accepts any username/password combination
 - Generates a new SSH host key if none exists
 - Stores todos in memory (data is lost when server restarts)
+- When using Docker, runs as non-root user in an isolated container
 
 For production use, proper authentication and persistent storage should be implemented.
 
@@ -103,4 +144,4 @@ limitations under the License.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. 
+Contributions are welcome! Please feel free to submit a Pull Request. The project uses GitHub Actions for CI, ensuring all tests pass before merging. 
