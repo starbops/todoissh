@@ -90,8 +90,13 @@ func (t *TerminalUI) refreshDisplay() {
 	// Header
 	t.write("Todo List\r\n")
 	t.write(strings.Repeat("─", t.width) + "\r\n")
-	t.write("Commands: ↑/↓: Navigate • Space: Toggle • Enter: Edit/Save • Tab: New • Delete: Remove • Ctrl+C: Exit\r\n")
-	t.write("         ←/→: Move cursor when editing\r\n")
+
+	// Only show commands in input mode
+	if t.inputMode {
+		t.write("Commands: ←/→: Move cursor • Enter: Save • Tab: Cancel • Ctrl+C: Exit\r\n")
+	} else {
+		t.write("Commands: ↑/↓: Navigate • Space: Toggle • Enter: Edit • Tab: New • Delete: Remove • Ctrl+C: Exit\r\n")
+	}
 	t.write("\r\n")
 
 	// Get and sort todos
