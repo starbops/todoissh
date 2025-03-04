@@ -61,8 +61,12 @@ A terminal-based todo list application accessible via SSH, built with Go. This a
 
 The project structure is organized as follows:
 
-- `main.go`: Contains the SSH server implementation and terminal UI logic
-- `todo/todo.go`: Implements the todo list data structure and operations
+- `main.go`: Application entry point
+- `pkg/`: Application packages
+  - `config/`: Configuration management
+  - `ssh/`: SSH server implementation
+  - `todo/`: Todo list data structure and operations
+  - `ui/`: Terminal user interface implementation
 - `.gitignore`: Specifies which files Git should ignore
 - `go.mod` & `go.sum`: Go module files for dependency management
 
