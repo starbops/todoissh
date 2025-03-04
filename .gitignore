@@ -24,4 +24,7 @@ vendor/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+
+# GitHub Actions
+.github/workflows/.cache/ 
