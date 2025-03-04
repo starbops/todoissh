@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+# Script to run tests and generate reports
+
+echo "Testing..."
+
+# Create test reports directory if it doesn't exist
+mkdir -p test/reports
+
+# Run tests with coverage and generate reports
+go test -v ./... \
+    -coverprofile=test/reports/coverage.out \
+    -covermode=atomic \
+    -json > test/reports/test-report.json
+
+# Generate HTML coverage report
+go tool cover -html=test/reports/coverage.out -o test/reports/coverage.html
+
+# Generate test summary
+echo "Generating test summary..."
+cat test/reports/test-report.json | jq -r '
+    select(.Action == "pass" or .Action == "fail") |
+    "\(.Action): \(.Package) - \(.Test)"
+' > test/reports/test-summary.txt
+
+# Print test results
+echo "Test Results:"
+echo "============"
+if [ -f test/reports/test-summary.txt ]; then
+    cat test/reports/test-summary.txt
+fi
+
+# Check if any tests failed
+if grep -q "fail" test/reports/test-summary.txt; then
+    echo "❌ Some tests failed!"
+    exit 1
+else
+    echo "✅ All tests passed!"
+fi
+
+echo "Test reports generated in test/reports/" 

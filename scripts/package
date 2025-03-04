@@ -3,6 +3,12 @@ set -e
 
 # Script to package the todoissh application into a Docker image
 
+# Check if binary exists
+if [ ! -f "bin/todoissh" ]; then
+    echo "Binary not found in bin/todoissh. Please run 'make build' first."
+    exit 1
+fi
+
 echo "Packaging todoissh into Docker image..."
 
 # Build the Docker image

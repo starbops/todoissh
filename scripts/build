@@ -5,13 +5,13 @@ set -e
 
 echo "Building todoissh..."
 
+# Create bin directory if it doesn't exist
+mkdir -p bin
+
 # Ensure dependencies are up to date
 go mod download
 
-# Run tests
-go test ./...
-
 # Build the application
-CGO_ENABLED=0 go build -o todoissh
+CGO_ENABLED=0 go build -o bin/todoissh
 
-echo "Build complete: todoissh" 
+echo "Build complete: bin/todoissh" 

@@ -8,12 +8,14 @@ id_rsa
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Test artifacts
 *.test
-
-# Output of the go coverage tool
-*.out
+test/reports/
+coverage.out
 coverage.html
+
+# Build artifacts directory
+bin/
 
 # Dependency directories
 vendor/
