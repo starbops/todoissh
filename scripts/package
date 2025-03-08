@@ -1,20 +1,43 @@
 #!/bin/bash
 set -e
 
-# Script to package the todoissh application into a Docker image
+# Script to package the todoissh application into a multi-architecture Docker image
+# and push to Docker Hub
 
-# Check if binary exists
-if [ ! -f "bin/todoissh" ]; then
-    echo "Binary not found in bin/todoissh. Please run 'make build' first."
+IMAGE_NAME="starbops/todoissh"
+TAG="latest"
+
+echo "Packaging todoissh into a multi-architecture Docker image..."
+
+# Enable Docker buildx for multi-architecture builds
+if ! docker buildx ls | grep -q multiarch-builder; then
+    echo "Creating multiarch-builder..."
+    docker buildx create --name multiarch-builder --use
+fi
+
+# Ensure multiarch-builder is active
+docker buildx use multiarch-builder
+docker buildx inspect --bootstrap
+
+# Check if user is logged in to Docker Hub
+if ! docker info | grep -q "Username"; then
+    echo "You need to be logged in to Docker Hub to push the image."
+    echo "Please run 'docker login' and try again."
     exit 1
 fi
 
-echo "Packaging todoissh into Docker image..."
+# Build and push multi-architecture image
+echo "Building and pushing multi-architecture image (linux/amd64, linux/arm64)..."
+docker buildx build --platform linux/amd64,linux/arm64 \
+    --tag ${IMAGE_NAME}:${TAG} \
+    --push \
+    .
 
-# Build the Docker image
-docker build -t todoissh .
+echo "Multi-architecture image built and pushed successfully!"
+echo "Image: ${IMAGE_NAME}:${TAG}"
+echo "Architectures: linux/amd64, linux/arm64"
 
-# Show the built image
-docker images todoissh --format "Image built successfully:\nRepository: {{.Repository}}\nTag: {{.Tag}}\nSize: {{.Size}}\nCreated: {{.CreatedSince}}"
+echo "Usage:"
+echo "  docker run -p 2222:2222 ${IMAGE_NAME}:${TAG}"
 
 echo "Packaging complete" 

@@ -3,11 +3,12 @@ package main
 import (
 	"log"
 
-	"golang.org/x/crypto/ssh"
 	"todoissh/pkg/config"
 	sshpkg "todoissh/pkg/ssh"
 	"todoissh/pkg/todo"
 	"todoissh/pkg/ui"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func main() {
@@ -33,4 +34,8 @@ func main() {
 	if err := server.Start(); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
-} 
+
+	// Keep the main function running
+	log.Printf("Server running on port %d. Press Ctrl+C to exit...", cfg.Port)
+	select {} // Block forever
+}

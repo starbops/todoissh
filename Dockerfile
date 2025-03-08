@@ -13,16 +13,19 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o todoissh
 
-# Final stage only - we're using pre-built binary
+# Final stage
 FROM alpine:3.19
+
+# Install dependencies
+RUN apk --no-cache add ca-certificates
 
 # Create a non-root user
 RUN adduser -D -h /app todoapp
 
 WORKDIR /app
 
-# Copy the pre-built binary
-COPY bin/todoissh .
+# Copy the binary from the builder stage
+COPY --from=builder /app/todoissh .
 
 # Set ownership
 RUN chown -R todoapp:todoapp /app
