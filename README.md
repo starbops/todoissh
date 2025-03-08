@@ -4,151 +4,149 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/starbops/todoissh)](https://go.dev)
 [![License](https://img.shields.io/github/license/starbops/todoissh)](LICENSE)
 
-A terminal-based todo list application accessible via SSH, built with Go. This application allows users to manage their todo items through a clean and interactive terminal user interface.
+A multi-user todo list application accessible via SSH with a clean terminal interface. Create your personal account, manage your tasks from anywhere, and enjoy the security of isolated user data.
 
-## Built With
+## Quick Start
 
-This project was created through an innovative collaboration:
-- Human guidance and vision
-- [Cursor](https://cursor.sh/) - The AI-first code editor
-- Claude 3.5 Sonnet - Advanced AI assistant
+### Using Docker (Recommended)
 
-## Features
+```bash
+# Run the container
+docker run -d -p 2222:2222 starbops/todoissh
 
-- **SSH Access**: Connect to your todo list from anywhere using SSH
-- **Interactive TUI**: Clean and responsive terminal user interface
-- **Todo Management**:
-  - View todo items in a list
-  - Add new todo items
-  - Edit existing todos
-  - Toggle completion status
-  - Delete todos
-- **Keyboard Navigation**:
-  - ↑/↓: Navigate through todos
-  - Space: Toggle completion status
-  - Enter: Edit selected todo
-  - Tab: Create new todo
-  - Delete: Remove selected todo
-  - Ctrl+C: Exit application
-- **Docker Support**: Run in an isolated container for improved security
-- **Continuous Integration**: Automated testing and building via GitHub Actions
-
-## Prerequisites
-
-- Go 1.24 or higher
-- SSH client
-- Docker (optional, for containerized deployment)
-- Make
-
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/starbops/todoissh.git
-   cd todoissh
-   ```
-
-2. Build and test:
-   ```bash
-   make all
-   ```
-   This will:
-   - Run all tests
-   - Generate test reports
-   - Build the binary
-   - Create a Docker image
-
-   Individual commands:
-   - `make test`: Run tests only
-   - `make build`: Build the binary
-   - `make package`: Create Docker image
-   - `make clean`: Clean up build artifacts
-
-## Usage
+# Connect with your username
+ssh yourname@localhost -p 2222
+```
 
 ### Running Locally
 
-1. Start the server:
-   ```bash
-   ./bin/todoissh
-   ```
-   The server will start listening on port 2222 by default.
+```bash
+# Clone and build
+git clone https://github.com/starbops/todoissh.git
+cd todoissh
+make all
 
-### Running with Docker
+# Start the server
+./bin/todoissh
 
-1. Start the container:
-   ```bash
-   docker run -d -p 2222:2222 todoissh
-   ```
+# Connect with your username
+ssh yourname@localhost -p 2222
+```
 
-2. Connect to the server:
-   ```bash
-   ssh localhost -p 2222
-   ```
-   Note: The server accepts any username/password combination for demonstration purposes.
+## Features
+
+- **Multi-User Support** - Each user has their own private todo list with secure authentication
+- **Terminal UI** - Clean, intuitive interface optimized for keyboard navigation
+- **Data Persistence** - Your todos are saved between sessions
+- **Secure Design** - Password hashing with bcrypt and data isolation between users
+- **Accessible Anywhere** - Connect via any SSH client, even on mobile devices
+
+## Usage
+
+### First-Time Connection
+
+When connecting with a new username, you'll be guided through a simple registration:
+
+```
+Welcome to TodoiSSH!
+────────────────────────────────────────────────────────────────────────────────
+
+Hello, newuser! You need to complete registration.
+
+Please set a password for your account.
+Password must be at least 6 characters long.
+
+Password: ******
+```
+
+### Managing Your Todos
+
+After authentication, you'll see your personal todo list with full keyboard controls:
+
+```
+Todo List - User: myusername
+────────────────────────────────────────────────────────────────────────────────
+Commands: ↑/↓: Navigate • Space: Toggle • Enter: Edit • Tab: New • Delete: Remove • Ctrl+C: Exit
+
+[ ] Buy groceries
+[✓] Finish documentation
+[ ] Fix bug in registration flow
+[ ] Add unit tests
+
+────────────────────────────────────────────────────────────────────────────────
+```
+
+**Keyboard Controls:**
+- ↑/↓: Navigate through todos
+- Space: Toggle completion status
+- Enter: Edit selected todo
+- Tab: Create new todo
+- Delete: Remove selected todo
+- Ctrl+C: Exit application
+
+## Advanced Usage
+
+### Using Docker with Persistent Storage
+
+```bash
+# Create a volume for persistent storage
+docker volume create todoissh-data
+
+# Run with the volume mounted
+docker run -d -p 2222:2222 -v todoissh-data:/app/data todoissh
+```
+
+### Custom Configuration
+
+```bash
+# Run with a custom port
+./bin/todoissh --port 2223
+
+# Enable debug logging
+./bin/todoissh --debug
+```
 
 ## Development
 
-The project structure is organized as follows:
+### Project Structure
 
-- `main.go`: Application entry point
-- `pkg/`: Application packages
-  - `config/`: Configuration management
-  - `ssh/`: SSH server implementation
-  - `todo/`: Todo list data structure and operations
-  - `ui/`: Terminal user interface implementation
-- `scripts/`: Build and test scripts
-  - `build`: Builds the application
-  - `test`: Runs tests and generates reports
-  - `package`: Creates Docker image
-- `bin/`: Build artifacts (not in git)
-- `test/reports/`: Test results and coverage reports (not in git)
-- `.github/workflows/`: CI pipeline definitions
-- `Dockerfile`: Container definition
-- `Makefile`: Build automation
-- `.gitignore`: Specifies which files Git should ignore
-- `go.mod` & `go.sum`: Go module files for dependency management
-
-## Testing
-
-Run the test suite:
-```bash
-make test
+```
+todoissh/
+├── main.go              # Application entry point
+├── pkg/                 # Application packages
+│   ├── config/          # Configuration management
+│   ├── ssh/             # SSH server implementation
+│   ├── todo/            # Todo list data structure
+│   └── ui/              # Terminal user interface
+├── test/                # Test files and reports
+└── scripts/             # Build and test scripts
 ```
 
-Test artifacts will be generated in `test/reports/`:
-- `coverage.html`: HTML coverage report
-- `test-report.json`: Detailed test results
-- `test-summary.txt`: Human-readable test summary
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run specific package tests
+go test ./pkg/todo
+```
+
+See [test/README.md](test/README.md) for detailed testing information.
 
 ## Security Note
 
-This is a demonstration project and includes simplified security measures:
-- Accepts any username/password combination
-- Generates a new SSH host key if none exists
-- Stores todos in memory (data is lost when server restarts)
-- When using Docker, runs as non-root user in an isolated container
-
-For production use, proper authentication and persistent storage should be implemented.
+- User authentication with bcrypt password hashing
+- Data isolation between users
+- SSH host key generation and management
+- Docker container runs as non-root user
 
 ## License
 
-Apache License 2.0
+Apache License 2.0. See [LICENSE](LICENSE) for details.
 
-Copyright 2024 Zespre Chang <starbops@zespre.com>
+## Built With
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. The project uses GitHub Actions for CI, ensuring all tests pass before merging. 
+- Go 1.24+
+- [Cursor](https://cursor.sh/) - The AI-first code editor
+- Claude 3.5 Sonnet - Advanced AI assistant

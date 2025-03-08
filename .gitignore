@@ -1,5 +1,20 @@
-# SSH host key
+# SSH keys and security related
 id_rsa
+id_rsa.pub
+id_*
+*.pem
+*.key
+*.crt
+*.cer
+
+# Environment and secrets
+.env
+.env.*
+*.env
+secrets/
+*password*
+*credential*
+*secret*
 
 # Go build artifacts
 *.exe
@@ -13,12 +28,17 @@ id_rsa
 test/reports/
 coverage.out
 coverage.html
+*.coverprofile
 
 # Build artifacts directory
 bin/
+dist/
+build/
 
 # Dependency directories
 vendor/
+Godeps/
+go.work
 
 # IDE specific files
 .idea/
@@ -26,5 +46,29 @@ vendor/
 *.swp
 *.swo
 
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.bak
+*.backup
+
+# Data directories and databases
+data/
+*.db
+*.sqlite
+.todoissh/
+
 # GitHub Actions
-.github/workflows/.cache/ 
+.github/workflows/.cache/
+
+# OS generated files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -8,6 +8,7 @@ import (
 	sshpkg "todoissh/pkg/ssh"
 	"todoissh/pkg/todo"
 	"todoissh/pkg/ui"
+	"todoissh/pkg/user"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -30,19 +31,38 @@ func main() {
 	// Configure logging based on verbosity level
 	setupLogging(cfg.LogLevel)
 
+	// Create data directory
+	dataDir := "data"
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+
+	// Initialize user store
+	userStore, err := user.NewStore(dataDir)
+	if err != nil {
+		log.Fatalf("Failed to initialize user store: %v", err)
+	}
+
 	// Initialize todo store
-	todoStore := todo.NewStore()
+	todoStore, err := todo.NewStore(dataDir)
+	if err != nil {
+		log.Fatalf("Failed to initialize todo store: %v", err)
+	}
 
 	// Create and start SSH server
 	log.Printf("Starting server on port %d...", cfg.Port)
-	server, err := sshpkg.NewServer(cfg.Port, cfg.HostKey)
+	server, err := sshpkg.NewServer(cfg.Port, cfg.HostKey, userStore)
 	if err != nil {
 		log.Fatalf("Failed to create SSH server: %v", err)
 	}
 
 	// Set channel handler
-	server.SetChannelHandler(func(channel ssh.Channel, requests <-chan *ssh.Request) {
-		termUI := ui.NewTerminalUI(channel, todoStore)
+	server.SetChannelHandler(func(username string, channel ssh.Channel, requests <-chan *ssh.Request) {
+		// Check if this is a new user
+		isNewUser := userStore.GetUser(username) == nil
+
+		// Create terminal UI with user information
+		termUI := ui.NewTerminalUI(channel, todoStore, userStore, username, isNewUser)
 		termUI.HandleChannel(requests)
 	})
 

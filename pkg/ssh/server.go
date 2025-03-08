@@ -12,32 +12,36 @@ import (
 	"os"
 	"sync"
 
+	"todoissh/pkg/user"
+
 	"golang.org/x/crypto/ssh"
 )
 
 // Server represents an SSH server instance
 type Server struct {
-	config   *ssh.ServerConfig
-	port     int
-	hostKey  string
-	handler  func(ssh.Channel, <-chan *ssh.Request)
-	listener net.Listener
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	mu       sync.Mutex
-	conns    map[net.Conn]struct{}
+	config    *ssh.ServerConfig
+	port      int
+	hostKey   string
+	handler   func(string, ssh.Channel, <-chan *ssh.Request) // Updated to include username
+	listener  net.Listener
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	mu        sync.Mutex
+	conns     map[net.Conn]struct{}
+	userStore *user.Store
 }
 
 // NewServer creates a new SSH server instance
-func NewServer(port int, hostKeyPath string) (*Server, error) {
+func NewServer(port int, hostKeyPath string, userStore *user.Store) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	server := &Server{
-		port:    port,
-		hostKey: hostKeyPath,
-		ctx:     ctx,
-		cancel:  cancel,
-		conns:   make(map[net.Conn]struct{}),
+		port:      port,
+		hostKey:   hostKeyPath,
+		ctx:       ctx,
+		cancel:    cancel,
+		conns:     make(map[net.Conn]struct{}),
+		userStore: userStore,
 	}
 
 	// Generate the server's private key if it doesn't exist
@@ -65,8 +69,34 @@ func NewServer(port int, hostKeyPath string) (*Server, error) {
 
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			// For this example, allow any username/password
-			return &ssh.Permissions{}, nil
+			username := c.User()
+
+			// Check if user exists and password is correct
+			currentUser, authenticated := server.userStore.Authenticate(username, string(pass))
+
+			if authenticated {
+				// User exists and password is correct
+				return &ssh.Permissions{
+					Extensions: map[string]string{
+						"username": username,
+						"is_new":   "false",
+					},
+				}, nil
+			}
+
+			// If user doesn't exist, we'll handle registration in the channel handler
+			// Allow connection to proceed, but mark that this is a new user
+			if currentUser != nil && currentUser.IsNew {
+				return &ssh.Permissions{
+					Extensions: map[string]string{
+						"username": username,
+						"is_new":   "true",
+					},
+				}, nil
+			}
+
+			// Invalid password for existing user
+			return nil, fmt.Errorf("invalid username or password")
 		},
 	}
 	config.AddHostKey(private)
@@ -76,7 +106,7 @@ func NewServer(port int, hostKeyPath string) (*Server, error) {
 }
 
 // SetChannelHandler sets the handler for new SSH channels
-func (s *Server) SetChannelHandler(handler func(ssh.Channel, <-chan *ssh.Request)) {
+func (s *Server) SetChannelHandler(handler func(string, ssh.Channel, <-chan *ssh.Request)) {
 	s.handler = handler
 }
 
@@ -139,6 +169,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	go ssh.DiscardRequests(reqs)
 
+	// Get the username from the connection permissions
+	username := sshConn.Permissions.Extensions["username"]
+	_ = sshConn.Permissions.Extensions["is_new"] == "true" // We'll use this in the handler
+
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
 			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
@@ -152,7 +186,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if s.handler != nil {
-			go s.handler(channel, requests)
+			// Pass the username to the channel handler
+			go s.handler(username, channel, requests)
 		} else {
 			channel.Close()
 		}
