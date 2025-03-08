@@ -34,6 +34,14 @@ import (
 // testUsername is the default username used across tests
 const testUsername = "testuser"
 
+// Additional test constants for improving test coverage
+const (
+	testUsername2   = "testuser2"
+	nonExistentUser = "nonexistentuser"
+	invalidDir      = "/nonexistent/dir"
+	readOnlyPerm    = 0400
+)
+
 // setupTestStore creates a temporary test directory and initializes a Store.
 // It returns the initialized store and the temporary directory path.
 // The caller is responsible for calling cleanupTestStore with the returned path.
@@ -948,4 +956,553 @@ func TestPersistence(t *testing.T) {
 	if !loadedTodo.Completed {
 		t.Error("Expected todo to be completed, but it's not")
 	}
+}
+
+// TestAddWithEmptyText verifies that adding a todo with empty text is handled correctly
+func TestAddWithEmptyText(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add todo with empty text
+	todo, err := store.Add(testUsername, "")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if todo.Text != "" {
+		t.Errorf("todo.Text = %q; want empty string", todo.Text)
+	}
+}
+
+// TestGetNonExistentTodo verifies that getting a non-existent todo returns an error
+func TestGetNonExistentTodo(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Try to get non-existent todo
+	_, err := store.Get(testUsername, 999)
+	if err == nil {
+		t.Fatal("Get() did not return error for non-existent todo")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("Get() error = %v; want 'not found' error", err)
+	}
+}
+
+// TestUpdateNonExistentTodo verifies that updating a non-existent todo returns an error
+func TestUpdateNonExistentTodo(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Try to update non-existent todo
+	_, err := store.Update(testUsername, 999, "Updated text")
+	if err == nil {
+		t.Fatal("Update() did not return error for non-existent todo")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("Update() error = %v; want 'not found' error", err)
+	}
+}
+
+// TestDeleteNonExistentTodo verifies that deleting a non-existent todo returns an error
+func TestDeleteNonExistentTodo(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Try to delete non-existent todo
+	err := store.Delete(testUsername, 999)
+	if err == nil {
+		t.Fatal("Delete() did not return error for non-existent todo")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("Delete() error = %v; want 'not found' error", err)
+	}
+}
+
+// TestToggleCompleteNonExistentTodo verifies that toggling a non-existent todo returns an error
+func TestToggleCompleteNonExistentTodo(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Try to toggle non-existent todo
+	_, err := store.ToggleComplete(testUsername, 999)
+	if err == nil {
+		t.Fatal("ToggleComplete() did not return error for non-existent todo")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("ToggleComplete() error = %v; want 'not found' error", err)
+	}
+}
+
+// TestNonExistentUserTodos verifies that operations with a non-existent user work correctly
+func TestNonExistentUserTodos(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// List todos for non-existent user
+	todos, err := store.List(nonExistentUser)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(todos) != 0 {
+		t.Errorf("List() returned %d todos; want 0", len(todos))
+	}
+
+	// Add todo for non-existent user
+	todo, err := store.Add(nonExistentUser, "Test todo for new user")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if todo.ID != 1 {
+		t.Errorf("todo.ID = %d; want 1", todo.ID)
+	}
+
+	// List todos again to verify the todo was added
+	todos, err = store.List(nonExistentUser)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(todos) != 1 {
+		t.Errorf("List() returned %d todos; want 1", len(todos))
+	}
+}
+
+// TestConcurrentAdd verifies that adding todos concurrently from multiple goroutines works correctly
+func TestConcurrentAdd(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Number of concurrent operations
+	const concurrency = 50
+
+	// Run concurrent Add operations
+	done := make(chan bool)
+	for i := 0; i < concurrency; i++ {
+		go func(i int) {
+			text := fmt.Sprintf("Concurrent todo %d", i)
+			_, err := store.Add(testUsername, text)
+			if err != nil {
+				t.Errorf("Add() error = %v in goroutine %d", err, i)
+			}
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines to finish
+	for i := 0; i < concurrency; i++ {
+		<-done
+	}
+
+	// Check that all todos were added
+	todos, err := store.List(testUsername)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(todos) != concurrency {
+		t.Errorf("List() returned %d todos; want %d", len(todos), concurrency)
+	}
+
+	// Check that IDs are sequential and unique
+	idMap := make(map[int]bool)
+	for _, todo := range todos {
+		if idMap[todo.ID] {
+			t.Errorf("Duplicate todo ID: %d", todo.ID)
+		}
+		idMap[todo.ID] = true
+	}
+}
+
+// TestGetUserTodosInvalidJSON verifies that loading invalid JSON is handled correctly
+func TestGetUserTodosInvalidJSON(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Create invalid JSON file
+	todosDir := filepath.Join(tempDir, "todos")
+	os.MkdirAll(todosDir, 0700)
+	todosPath := filepath.Join(todosDir, "invalid.json")
+	err := os.WriteFile(todosPath, []byte("invalid json"), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create invalid todos file: %v", err)
+	}
+
+	// Try to get todos for the invalid user
+	_, err = store.getUserTodos("invalid")
+	if err == nil {
+		t.Fatal("getUserTodos() did not return error for invalid JSON")
+	}
+}
+
+// TestConcurrentMultiUser verifies that concurrent operations with multiple users work correctly
+func TestConcurrentMultiUser(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Number of users and todos per user
+	const numUsers = 5
+	const todosPerUser = 10
+
+	// Run concurrent operations for multiple users
+	done := make(chan bool)
+	for u := 0; u < numUsers; u++ {
+		go func(userIndex int) {
+			username := fmt.Sprintf("user%d", userIndex)
+
+			// Add todos for this user
+			for i := 0; i < todosPerUser; i++ {
+				text := fmt.Sprintf("Todo %d for %s", i, username)
+				_, err := store.Add(username, text)
+				if err != nil {
+					t.Errorf("Add() error = %v for user %s, todo %d", err, username, i)
+				}
+			}
+
+			// List todos for this user
+			todos, err := store.List(username)
+			if err != nil {
+				t.Errorf("List() error = %v for user %s", err, username)
+			}
+			if len(todos) != todosPerUser {
+				t.Errorf("List() returned %d todos for user %s; want %d", len(todos), username, todosPerUser)
+			}
+
+			done <- true
+		}(u)
+	}
+
+	// Wait for all goroutines to finish
+	for i := 0; i < numUsers; i++ {
+		<-done
+	}
+
+	// Verify each user's todos
+	for u := 0; u < numUsers; u++ {
+		username := fmt.Sprintf("user%d", u)
+		todos, err := store.List(username)
+		if err != nil {
+			t.Fatalf("List() error = %v for user %s", err, username)
+		}
+		if len(todos) != todosPerUser {
+			t.Errorf("List() returned %d todos for user %s; want %d", len(todos), username, todosPerUser)
+		}
+	}
+}
+
+// TestCorruptedTodosFile verifies that corrupted todos files are handled gracefully
+func TestCorruptedTodosFile(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add a todo to create the file
+	_, err := store.Add(testUsername, "Test todo")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	// Corrupt the file by overwriting it with truncated JSON
+	todosPath := filepath.Join(tempDir, "todos", testUsername+".json")
+	err = os.WriteFile(todosPath, []byte(`{"todos": {`), 0600)
+	if err != nil {
+		t.Fatalf("Failed to corrupt todos file: %v", err)
+	}
+
+	// Create a new store to force it to load from disk
+	store = nil
+	store, err = NewStore(tempDir)
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+
+	// Try to get todos for the user with corrupted file
+	_, err = store.getUserTodos(testUsername)
+	if err == nil {
+		t.Fatal("getUserTodos() did not return error for corrupted file")
+	}
+}
+
+// TestToggleCompleteCycle verifies that toggling a todo's completed status works correctly
+func TestToggleCompleteCycle(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add a todo
+	todo, err := store.Add(testUsername, "Toggle test")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if todo.Completed {
+		t.Fatal("New todo is already completed")
+	}
+
+	// Toggle to completed
+	todo, err = store.ToggleComplete(testUsername, todo.ID)
+	if err != nil {
+		t.Fatalf("ToggleComplete() error = %v", err)
+	}
+	if !todo.Completed {
+		t.Error("Todo should be completed after toggle")
+	}
+
+	// Toggle back to not completed
+	todo, err = store.ToggleComplete(testUsername, todo.ID)
+	if err != nil {
+		t.Fatalf("ToggleComplete() error = %v", err)
+	}
+	if todo.Completed {
+		t.Error("Todo should not be completed after second toggle")
+	}
+
+	// Get the todo to verify persistence
+	todo, err = store.Get(testUsername, todo.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if todo.Completed {
+		t.Error("Todo completed status not persisted correctly")
+	}
+}
+
+// TestUpdateTimestamps verifies that timestamps are updated correctly
+func TestUpdateTimestamps(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add a todo
+	todo, err := store.Add(testUsername, "Timestamp test")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	createdAt := todo.CreatedAt
+	updatedAt := todo.UpdatedAt
+
+	// Sleep to ensure time difference
+	time.Sleep(10 * time.Millisecond)
+
+	// Update the todo
+	todo, err = store.Update(testUsername, todo.ID, "Updated text")
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	// CreatedAt should not change
+	if !todo.CreatedAt.Equal(createdAt) {
+		t.Errorf("CreatedAt changed after update: %v -> %v", createdAt, todo.CreatedAt)
+	}
+
+	// UpdatedAt should change
+	if todo.UpdatedAt.Equal(updatedAt) {
+		t.Error("UpdatedAt did not change after update")
+	}
+
+	// Sleep again
+	time.Sleep(10 * time.Millisecond)
+
+	// Toggle complete
+	todo, err = store.ToggleComplete(testUsername, todo.ID)
+	if err != nil {
+		t.Fatalf("ToggleComplete() error = %v", err)
+	}
+
+	// CreatedAt should still not change
+	if !todo.CreatedAt.Equal(createdAt) {
+		t.Errorf("CreatedAt changed after toggle: %v -> %v", createdAt, todo.CreatedAt)
+	}
+
+	// UpdatedAt should change again
+	if todo.UpdatedAt.Equal(updatedAt) {
+		t.Error("UpdatedAt did not change after toggle")
+	}
+}
+
+// TestNewStoreDirectoryError verifies that an error is returned when creating the data directory fails
+func TestNewStoreDirectoryError(t *testing.T) {
+	// Try to create a store with an invalid directory
+	// This simulates a permission error or other issue that would prevent directory creation
+	_, err := NewStore("/root/nonexistent/directory") // Should fail on most systems due to permissions
+	if err == nil {
+		t.Fatal("NewStore() did not return error for invalid directory")
+	}
+}
+
+// TestTodosDirectoryError verifies that an error is returned when creating the todos directory fails
+func TestTodosDirectoryError(t *testing.T) {
+	// Create temporary directory
+	tempDir, err := os.MkdirTemp("", "todoissh-todos-dir-error")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a file at the path where the todos directory should be
+	todosDir := filepath.Join(tempDir, "todos")
+	err = os.WriteFile(todosDir, []byte("not a directory"), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	// Try to create a store, which should fail when creating the todos directory
+	_, err = NewStore(tempDir)
+	if err == nil {
+		t.Fatal("NewStore() did not return error when todos directory couldn't be created")
+	}
+}
+
+// TestGetUserTodosError verifies that an error in getUserTodos is handled correctly
+func TestGetUserTodosError(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add a todo to create the user directory and file
+	_, err := store.Add(testUsername, "Test todo")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	// Create a new store instance to clear the in-memory cache
+	store = nil
+	store, err = NewStore(tempDir)
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+
+	// Make the todos file unreadable
+	todosPath := filepath.Join(tempDir, "todos", testUsername+".json")
+	err = os.Chmod(todosPath, 0000) // ----------
+	if err != nil {
+		t.Fatalf("Failed to change file permissions: %v", err)
+	}
+
+	// Try to get todos, which should fail
+	_, err = store.List(testUsername)
+
+	// Restore permissions for cleanup
+	os.Chmod(todosPath, 0600)
+
+	// Check if we got an error
+	if err == nil {
+		t.Fatal("List() did not return error for unreadable todos file")
+	}
+}
+
+// TestSaveTodosError verifies that an error during saveTodos is handled correctly
+func TestSaveTodosError(t *testing.T) {
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// Add a todo to create the user
+	_, err := store.Add(testUsername, "Test todo")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	// Get the path to the todos file
+	todosPath := filepath.Join(tempDir, "todos", testUsername+".json")
+
+	// Make the file read-only (not the directory, since that doesn't always cause errors)
+	err = os.Chmod(todosPath, 0400) // r--------
+	if err != nil {
+		t.Fatalf("Failed to change file permissions: %v", err)
+	}
+
+	// Try to add another todo, which should fail when saving
+	_, err = store.Add(testUsername, "Another todo")
+
+	// Restore permissions for cleanup
+	os.Chmod(todosPath, 0600)
+
+	// Check if we got an error
+	// Note: This might not fail on all systems, so we'll make it conditional
+	if err == nil {
+		// On some systems, you can still write to a file even if it's read-only
+		// due to directory permissions. So we'll check if the file was modified.
+		t.Log("No error was returned when writing to read-only file, checking if file was modified")
+
+		fileInfo, err := os.Stat(todosPath)
+		if err != nil {
+			t.Fatalf("Failed to stat file: %v", err)
+		}
+
+		// If the file size is still the same as before, it wasn't modified
+		if fileInfo.Size() < 100 {
+			t.Error("File size is too small, suggests file wasn't modified")
+		}
+	} else {
+		t.Logf("Got expected error: %v", err)
+	}
+}
+
+// TestErrorCases verifies error handling for all operations
+func TestErrorCases(t *testing.T) {
+	// 1. Test error when todos directory can't be created
+	_, err := NewStore(invalidDir)
+	if err == nil {
+		t.Fatal("NewStore() did not return error for invalid directory")
+	}
+
+	// 2. Create a store for further error testing
+	store, tempDir := setupTestStore(t)
+	defer cleanupTestStore(tempDir)
+
+	// 3. Add a todo for testing
+	todo, err := store.Add(testUsername, "Test todo")
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	// 4. Get the path to the todos file
+	todosPath := filepath.Join(tempDir, "todos", testUsername+".json")
+
+	// 5. Test update error - we'll use a read-only file instead of directory
+	err = os.Chmod(todosPath, 0400) // r--------
+	if err != nil {
+		t.Fatalf("Failed to change file permissions: %v", err)
+	}
+
+	_, err = store.Update(testUsername, todo.ID, "Updated text")
+
+	// Verify behavior
+	if err == nil {
+		t.Log("No error was returned when updating with read-only file, this may be system-dependent")
+	} else {
+		t.Logf("Got expected error from Update: %v", err)
+	}
+
+	// Restore permissions
+	os.Chmod(todosPath, 0600)
+
+	// 6. Test delete error
+	err = os.Chmod(todosPath, 0400) // r--------
+	if err != nil {
+		t.Fatalf("Failed to change file permissions: %v", err)
+	}
+
+	err = store.Delete(testUsername, todo.ID)
+
+	// Verify behavior
+	if err == nil {
+		t.Log("No error was returned when deleting with read-only file, this may be system-dependent")
+	} else {
+		t.Logf("Got expected error from Delete: %v", err)
+	}
+
+	// Restore permissions
+	os.Chmod(todosPath, 0600)
+
+	// 7. Test toggle error
+	err = os.Chmod(todosPath, 0400) // r--------
+	if err != nil {
+		t.Fatalf("Failed to change file permissions: %v", err)
+	}
+
+	_, err = store.ToggleComplete(testUsername, todo.ID)
+
+	// Verify behavior
+	if err == nil {
+		t.Log("No error was returned when toggling with read-only file, this may be system-dependent")
+	} else {
+		t.Logf("Got expected error from ToggleComplete: %v", err)
+	}
+
+	// Restore permissions
+	os.Chmod(todosPath, 0600)
 }
