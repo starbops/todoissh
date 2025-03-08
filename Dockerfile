@@ -37,4 +37,4 @@ USER todoapp
 EXPOSE 2222
 
 # Run the application
-CMD ["./todoissh"] 
+ENTRYPOINT ["./todoissh"] 
