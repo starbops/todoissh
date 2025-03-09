@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -192,7 +191,7 @@ func (t *TerminalUI) refreshDisplay() {
 			if todo.Completed {
 				status = "[✓]"
 			}
-			t.write(fmt.Sprintf("%s%s %d. %s\r\n", prefix, status, todo.ID, todo.Text))
+			t.write(fmt.Sprintf("%s%s %d. %s\r\n", prefix, status, i+1, todo.Text))
 		}
 	}
 
@@ -365,7 +364,8 @@ func (t *TerminalUI) handleInput() error {
 							log.Printf("Error adding todo: %v", err)
 						}
 					} else {
-						id, _ := strconv.Atoi(strings.TrimPrefix(strings.TrimSuffix(t.inputLabel, ": "), "Edit todo "))
+						// Extract the actual todo ID from the selected todo
+						id := t.todos[t.selected].ID
 						_, err := t.todoStore.Update(t.username, id, text)
 						if err != nil {
 							log.Printf("Error updating todo: %v", err)
@@ -378,7 +378,8 @@ func (t *TerminalUI) handleInput() error {
 			} else if len(t.todos) > 0 {
 				t.mode = ModeInput
 				t.inputText = t.todos[t.selected].Text
-				t.inputLabel = fmt.Sprintf("Edit todo %d: ", t.todos[t.selected].ID)
+				// Just show "Edit todo:" instead of showing the ID
+				t.inputLabel = "Edit todo: "
 				t.cursorPos = len(t.inputText)
 			}
 		case 127: // Backspace
@@ -388,6 +389,7 @@ func (t *TerminalUI) handleInput() error {
 			}
 		case 32: // Space
 			if t.mode == ModeNormal && len(t.todos) > 0 {
+				// Use the actual ID from the selected todo
 				_, err := t.todoStore.ToggleComplete(t.username, t.todos[t.selected].ID)
 				if err != nil {
 					log.Printf("Error toggling todo: %v", err)
@@ -430,6 +432,7 @@ func (t *TerminalUI) handleInput() error {
 					continue
 				}
 				if t.mode == ModeNormal && len(t.todos) > 0 {
+					// Use the actual ID from the selected todo
 					if err := t.todoStore.Delete(t.username, t.todos[t.selected].ID); err != nil {
 						log.Printf("Error deleting todo: %v", err)
 					}
