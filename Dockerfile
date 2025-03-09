@@ -29,9 +29,47 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 # Copy the binary from the builder stage
 COPY --from=builder /app/todoissh /todoissh
 
-# No shell in scratch image - safer by default
-# No package vulnerabilities - contains only our binary
-# No need for user management (no users in scratch)
+# Create data directory. Note that in scratch we can't use RUN, 
+# so we need to shift to an intermediate stage
+WORKDIR /
+
+# We need to create the directory structure in the intermediate stage
+# and copy it to scratch. Let's use a small Alpine image for this.
+FROM alpine:3.19 as data-builder
+
+# Install OpenSSH to generate keys
+RUN apk add --no-cache openssh-keygen
+
+# Create data directories with proper permissions
+RUN mkdir -p /data/todos /data/users && \
+    # Create users.json with specific user ownership
+    touch /data/users.json && \
+    # Set ownership to user 10001
+    chown -R 10001:10001 /data && \
+    # Set more restrictive permissions
+    chmod 700 /data && \
+    chmod 700 /data/todos /data/users && \
+    chmod 600 /data/users.json
+
+# Generate an SSH host key with proper permissions
+RUN ssh-keygen -t rsa -f /data/id_rsa -N "" && \
+    chown 10001:10001 /data/id_rsa /data/id_rsa.pub && \
+    chmod 600 /data/id_rsa && \
+    chmod 644 /data/id_rsa.pub
+
+# Back to our scratch image
+FROM scratch
+
+# Copy CA certificates, timezone data, and binary from the builder stage
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /app/todoissh /todoissh
+
+# Copy the data directory from the data-builder stage
+COPY --from=data-builder /data /data
+
+# Set the DATA_DIR environment variable to the absolute path
+ENV DATA_DIR=/data
 
 # Expose SSH port
 EXPOSE 2222

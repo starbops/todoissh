@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	"todoissh/pkg/config"
 	sshpkg "todoissh/pkg/ssh"
@@ -31,10 +32,23 @@ func main() {
 	// Configure logging based on verbosity level
 	setupLogging(cfg.LogLevel)
 
+	// Use DATA_DIR environment variable if set, otherwise use default "data"
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "data"
+	}
+	log.Printf("Using data directory: %s", dataDir)
+
 	// Create data directory
-	dataDir := "data"
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
+	}
+
+	// Set the host key path to be in the data directory
+	hostKeyPath := filepath.Join(dataDir, "id_rsa")
+	if cfg.HostKey == "id_rsa" {
+		// Only override if it's the default value
+		cfg.HostKey = hostKeyPath
 	}
 
 	// Initialize user store
